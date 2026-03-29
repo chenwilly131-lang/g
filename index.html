@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="課程總覽">
+    <title>補習班課程追蹤器 Pro</title>
+    <style>
+        :root {
+            --bg-color: #121212; --card-bg: #1e1e1e; --text-main: #ffffff; --text-sub: #b3b3b3;
+            --accent: #0a84ff; --accent-hover: #006ee6; --danger: #ff453a; --success: #30d158;
+            --warning: #ffd60a;
+        }
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 20px; padding-top: 40px; padding-bottom: 50px; }
+        h1, h2, h3 { margin-top: 0; }
+        .card { background-color: var(--card-bg); border-radius: 16px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .course-card { cursor: pointer; transition: transform 0.2s; border: 1px solid #333; }
+        .course-card:active { transform: scale(0.98); }
+        .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .row-col { display: flex; flex-direction: column; width: 48%; }
+        label { font-size: 14px; color: var(--text-sub); margin-bottom: 5px; }
+        input[type="text"], input[type="number"], input[type="date"] { 
+            width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #333; 
+            background-color: #2c2c2c; color: white; font-size: 16px; 
+        }
+        button { 
+            width: 100%; padding: 15px; border: none; border-radius: 12px; 
+            background-color: var(--accent); color: white; font-size: 16px; font-weight: bold; 
+            cursor: pointer; margin-top: 10px;
+        }
+        button:active { background-color: var(--accent-hover); }
+        .btn-small { padding: 10px; width: 48%; margin-top: 0; }
+        .btn-danger { background-color: transparent; color: var(--danger); border: 1px solid var(--danger); }
+        .btn-back { background-color: #333; color: white; margin-bottom: 20px; width: auto; padding: 8px 15px; border-radius: 20px; font-size: 14px;}
+        
+        .progress-container { width: 100%; background-color: #333; border-radius: 10px; height: 12px; overflow: hidden; margin: 10px 0; }
+        .progress-bar { height: 100%; background-color: var(--success); width: 0%; transition: width 0.3s ease; }
+        .progress-text { font-size: 14px; color: var(--text-sub); text-align: right; }
+        
+        .schedule-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; margin-bottom: 15px; }
+        .day-col { display: flex; flex-direction: column; align-items: center; }
+        .day-label { font-size: 12px; color: var(--text-sub); margin-bottom: 5px; }
+        .day-input { width: 100%; text-align: center; padding: 8px 0; }
+        
+        .result-box { background-color: rgba(10, 132, 255, 0.1); border: 1px solid var(--accent); padding: 15px; border-radius: 12px; margin-top: 15px; font-size: 15px; line-height: 1.5; }
+        .highlight { color: var(--accent); font-weight: bold; font-size: 18px;}
+        .hidden { display: none !important; }
+        
+        .tabs { display: flex; margin-bottom: 15px; background: #333; border-radius: 10px; padding: 3px; }
+        .tab { flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-size: 14px; color: var(--text-sub); cursor: pointer; }
+        .tab.active { background: var(--card-bg); color: var(--text-main); font-weight: bold; }
+
+        #todayTasks { border-left: 4px solid var(--warning); }
+        .task-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #333; }
+        .task-item:last-child { border-bottom: none; }
+    </style>
+</head>
+<body>
+
+    <div id="viewOverview">
+        <h2>📊 學習進度總覽</h2>
+        
+        <div class="card" id="todayTasks">
+            <h3 style="color: var(--warning); margin-bottom: 10px;">📅 今日應看進度</h3>
+            <div id="todayTaskList"></div>
+        </div>
+
+        <div id="courseList"></div>
+
+        <button type="button" onclick="createNewCourse()">➕ 新增課程</button>
+    </div>
+
+    <div id="viewDetail" class="hidden">
+        <button type="button" class="btn-back" onclick="goBack()">🔙 返回總覽</button>
+        
+        <div class="card">
+            <input type="text" id="courseName" placeholder="點此輸入課程名稱..." style="font-size: 20px; font-weight: bold; margin-bottom: 15px; background: transparent; border: none; border-bottom: 2px solid #333; border-radius: 0; padding-left: 0;" onchange="saveCurrentCourse()">
+            
+            <div class="row">
+                <div class="row-col">
+                    <label>總集數</label>
+                    <input type="number" id="totalEps" placeholder="例如: 50" onchange="saveCurrentCourse()">
+                </div>
+                <div class="row-col">
+                    <label>每集時長 (分鐘)</label>
+                    <input type="number" id="epDuration" placeholder="例如: 45" onchange="saveCurrentCourse()">
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <label>目前已看</label>
+                <div style="font-size: 36px; font-weight: bold;">
+                    <span id="currentEp">0</span> / <span id="displayTotal">0</span>
+                </div>
+            </div>
+
+            <div class="progress-container" style="height: 20px;">
+                <div class="progress-bar" id="detailProgressBar"></div>
+            </div>
+            <div class="progress-text" id="detailProgressPercent" style="text-align: center; font-size: 18px; font-weight: bold; color: var(--success);">0%</div>
+
+            <div class="row" style="margin-top: 20px;">
+                <button type="button" class="btn-small btn-danger" onclick="changeEp(-1)">-1 退回</button>
+                <button type="button" class="btn-small" onclick="changeEp(1)" style="background-color: var(--success);">+1 記錄</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📅 讀書計畫規劃</h3>
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('weekly')">固定每週排程</div>
+                <div class="tab" onclick="switchTab('deadline')">目標日期規劃</div>
+            </div>
+
+            <div id="weeklyPlan">
+                <label>設定每週各天要看幾集：</label>
+                <div class="schedule-grid" style="margin-top: 10px;">
+                    <div class="day-col"><div class="day-label">一</div><input type="number" id="w1" class="day-input" onchange="saveCurrentCourse()"></div>
+                    <div class="day-col"><div class="day-label">二</div><input type="number" id="w2" class="day-input" onchange="saveCurrentCourse()"></div>
+                    <div class="day-col"><div class="day-label">三</div><input type="number" id="w3" class="day-input" onchange="saveCurrentCourse()"></div>
+                    <div class="day-col"><div class="day-label">四</div><input type="number" id="w4" class="day-input" onchange="saveCurrentCourse()"></div>
+                    <div class="day-col"><div class="day-label">五</div><input type="number" id="w5" class="day-input" onchange="saveCurrentCourse()"></div>
+                    <div class="day-col"><div class="day-label">六</div><input type="number" id="w6" class="day-input" onchange="saveCurrentCourse()"></div>
+                    <div class="day-col"><div class="day-label">日</div><input type="number" id="w0" class="day-input" onchange="saveCurrentCourse()"></div>
+                </div>
+                <div class="result-box" id="weeklyResult"></div>
+            </div>
+
+            <div id="deadlinePlan" class="hidden">
+                <label>我想在這一天前全部看完：</label>
+                <input type="date" id="deadlineDate" style="margin-top: 5px;" onchange="saveCurrentCourse()">
+                <div class="result-box hidden" id="deadlineResult"></div>
+            </div>
+        </div>
+
+        <button type="button" class="btn-danger" style="margin-top: 30px;" onclick="deleteCourse()">🗑️ 刪除此課程</button>
+    </div>
+
+<script>
+    let courses = [];
+    let currentId = null;
+
+    function init() {
+        try {
+            const saved = localStorage.getItem('multiCourseData');
+            if (saved) {
+                courses = JSON.parse(saved) || [];
+            }
+        } catch (e) {
+            alert("⚠️ 系統提示：您的瀏覽器目前封鎖了儲存功能（可能在 LINE 裡面或無痕模式）。請用 Safari 正常模式打開，否則無法新增課程喔！");
+        }
+        renderOverview();
+    }
+
+    function saveAll() {
+        try {
+            localStorage.setItem('multiCourseData', JSON.stringify(courses));
+        } catch(e) {
+            console.warn("無法儲存資料", e);
+        }
+    }
+
+    function generateId() {
+        return Math.random().toString(36).substr(2, 9);
+    }
+
+    function renderOverview() {
+        document.getElementById('viewOverview').classList.remove('hidden');
+        document.getElementById('viewDetail').classList.add('hidden');
+        
+        const listDiv = document.getElementById('courseList');
+        const taskListDiv = document.getElementById('todayTaskList');
+        listDiv.innerHTML = '';
+        taskListDiv.innerHTML = '';
+
+        const today = new Date().getDay(); 
+        let hasTaskToday = false;
+        let totalMinsToday = 0;
+
+        if (!courses || courses.length === 0) {
+            listDiv.innerHTML = '<div style="text-align:center; color:gray; padding: 20px;">目前沒有課程，點擊下方按鈕新增！</div>';
+            taskListDiv.innerHTML = '<div style="color:gray;">太棒了，今天沒有排定的進度！</div>';
+            return;
+        }
+
+        courses.forEach(course => {
+            let percent = course.totalEps > 0 ? ((course.currentEp / course.totalEps) * 100).toFixed(1) : 0;
+            let cardHTML = `
+                <div class="card course-card" onclick="openDetail('${course.id}')">
+                    <div style="display:flex; justify-content:space-between; margin-bottom: 8px;">
+                        <strong>${course.name || '未命名課程'}</strong>
+                        <span style="color:var(--text-sub)">${course.currentEp} / ${course.totalEps}</span>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-bar" style="width: ${percent}%;"></div>
+                    </div>
+                    <div class="progress-text">${percent}%</div>
+                </div>
+            `;
+            listDiv.innerHTML += cardHTML;
+
+            let targetToday = course.schedule ? (course.schedule[`w${today}`] || 0) : 0;
+            if (targetToday > 0) {
+                hasTaskToday = true;
+                let mins = targetToday * (course.epDuration || 0);
+                totalMinsToday += mins;
+                taskListDiv.innerHTML += `
+                    <div class="task-item">
+                        <span>${course.name || '未命名課程'}</span>
+                        <strong>看 ${targetToday} 集 <span style="color:var(--text-sub); font-size:12px;">(${mins > 0 ? mins+'分' : ''})</span></strong>
+                    </div>
+                `;
+            }
+        });
+
+        if (!hasTaskToday) {
+            taskListDiv.innerHTML = '<div style="color:gray;">太棒了，今天沒有排定的進度！</div>';
+        } else if (totalMinsToday > 0) {
+            taskListDiv.innerHTML += `<div style="text-align:right; margin-top:10px; font-size:14px; color:var(--text-sub);">預估總耗時：${totalMinsToday} 分鐘</div>`;
+        }
+    }
+
+    function createNewCourse() {
+        try {
+            const newCourse = {
+                id: generateId(),
+                name: '請輸入課程名稱',
+                totalEps: 0, epDuration: 0, currentEp: 0,
+                schedule: { w0:0, w1:0, w2:0, w3:0, w4:0, w5:0, w6:0 },
+                deadlineDate: ''
+            };
+            courses.push(newCourse);
+            saveAll();
+            openDetail(newCourse.id);
+        } catch (err) {
+            alert("⚠️ 新增發生錯誤，請確認是否使用 Safari 瀏覽器打開！錯誤代碼：" + err.message);
+        }
+    }
+
+    function openDetail(id) {
+        currentId = id;
+        const course = courses.find(c => c.id === id);
+        if(!course) return;
+
+        document.getElementById('viewOverview').classList.add('hidden');
+        document.getElementById('viewDetail').classList.remove('hidden');
+
+        document.getElementById('courseName').value = course.name;
+        document.getElementById('totalEps').value = course.totalEps || '';
+        document.getElementById('epDuration').value = course.epDuration || '';
+        
+        if(course.schedule) {
+            for(let i=0; i<=6; i++) document.getElementById(`w${i}`).value = course.schedule[`w${i}`] || 0;
+        }
+        document.getElementById('deadlineDate').value = course.deadlineDate || '';
+
+        updateDetailUI();
+    }
+
+    function goBack() {
+        saveCurrentCourse(); 
+        currentId = null;
+        renderOverview();
+    }
+
+    function saveCurrentCourse() {
+        if(!currentId) return;
+        const course = courses.find(c => c.id === currentId);
+        if(!course) return;
+
+        course.name = document.getElementById('courseName').value || '未命名課程';
+        course.totalEps = parseInt(document.getElementById('totalEps').value) || 0;
+        course.epDuration = parseInt(document.getElementById('epDuration').value) || 0;
+        
+        if(!course.schedule) course.schedule = {};
+        for(let i=0; i<=6; i++) {
+            course.schedule[`w${i}`] = parseInt(document.getElementById(`w${i}`).value) || 0;
+        }
+        course.deadlineDate = document.getElementById('deadlineDate').value;
+        
+        saveAll();
+        updateDetailUI();
+    }
+
+    function changeEp(amount) {
+        const course = courses.find(c => c.id === currentId);
+        if(!course) return;
+        if(course.totalEps === 0) {
+            alert("請先設定「總集數」喔！");
+            return;
+        }
+        
+        course.currentEp += amount;
+        if(course.currentEp < 0) course.currentEp = 0;
+        if(course.currentEp > course.totalEps) course.currentEp = course.totalEps;
+        
+        saveAll();
+        updateDetailUI();
+    }
+
+    function deleteCourse() {
+        if(confirm("確定要刪除這個課程嗎？刪除後無法恢復喔！")) {
+            courses = courses.filter(c => c.id !== currentId);
+            saveAll();
+            goBack();
+        }
+    }
+
+    function updateDetailUI() {
+        const course = courses.find(c => c.id === currentId);
+        if(!course) return;
+
+        document.getElementById('currentEp').innerText = course.currentEp;
+        document.getElementById('displayTotal').innerText = course.totalEps;
+        
+        let percent = 0;
+        if(course.totalEps > 0) percent = ((course.currentEp / course.totalEps) * 100).toFixed(1);
+        
+        document.getElementById('detailProgressBar').style.width = percent + '%';
+        document.getElementById('detailProgressPercent').innerText = percent + '%';
+
+        let weeklyTotal = 0;
+        if(course.schedule) {
+            for(let i=0; i<=6; i++) weeklyTotal += (course.schedule[`w${i}`] || 0);
+        }
+        const remaining = course.totalEps - course.currentEp;
+        
+        let wMsg = `每週總共會看 <span class="highlight">${weeklyTotal}</span> 集。<br>`;
+        if(weeklyTotal > 0 && remaining > 0) {
+            let weeksNeeded = Math.ceil(remaining / weeklyTotal);
+            wMsg += `依照這個速度，預計約 <span class="highlight">${weeksNeeded}</span> 週後可以全部看完！`;
+        }
+        document.getElementById('weeklyResult').innerHTML = wMsg;
+
+        const dBox = document.getElementById('deadlineResult');
+        if(!course.deadlineDate || course.totalEps === 0) {
+            dBox.classList.add('hidden');
+        } else {
+            dBox.classList.remove('hidden');
+            const end = new Date(course.deadlineDate);
+            end.setHours(23, 59, 59);
+            const now = new Date();
+            const diffDays = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+
+            if(remaining <= 0) {
+                dBox.innerHTML = `🎉 恭喜！這堂課已經完成囉！`;
+            } else if(diffDays <= 0) {
+                dBox.innerHTML = `⚠️ 期限已到！還剩 ${remaining} 集。`;
+            } else {
+                const epsPerDay = (remaining / diffDays).toFixed(1);
+                let dMsg = `距離目標還有 <span class="highlight">${diffDays}</span> 天，剩餘 ${remaining} 集。<br><br>`;
+                dMsg += `📈 系統規劃：每天平均需要看 <span class="highlight">${epsPerDay}</span> 集。`;
+                if(course.epDuration > 0) {
+                    dMsg += `<br>⏱️ 換算每天需花費約 <span class="highlight">${Math.round(epsPerDay * course.epDuration)}</span> 分鐘。`;
+                }
+                dBox.innerHTML = dMsg;
+            }
+        }
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('weeklyPlan').classList.add('hidden');
+        document.getElementById('deadlinePlan').classList.add('hidden');
+        
+        if(tab === 'weekly') {
+            document.querySelectorAll('.tab')[0].classList.add('active');
+            document.getElementById('weeklyPlan').classList.remove('hidden');
+        } else {
+            document.querySelectorAll('.tab')[1].classList.add('active');
+            document.getElementById('deadlinePlan').classList.remove('hidden');
+        }
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>
